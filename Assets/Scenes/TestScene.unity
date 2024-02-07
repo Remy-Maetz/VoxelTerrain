@@ -168,10 +168,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   heightMap: {fileID: 5562026061888431244, guid: b0c234b16f88ec14bb5803e53d54b23e, type: 2}
+  colorMap: {fileID: 2800000, guid: c994901fb03add04fb0dee792851673f, type: 3}
   referenceMaterial: {fileID: 2100000, guid: 0e243c4bb02213b4194c412d26a95b04, type: 2}
   size: {x: 256, y: 256}
-  height: 64
+  height: 32
   chunkSize: 16
+  drawGizmos: 0
   regenerate: 0
 --- !u!1 &1058277944
 GameObject:
