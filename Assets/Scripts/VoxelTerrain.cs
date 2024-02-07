@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[ExecuteAlways]
+[ExecuteAlways] //Required to render the meshes
 public class VoxelTerrain : MonoBehaviour
 {
     public Texture2D heightMap;
@@ -14,6 +14,13 @@ public class VoxelTerrain : MonoBehaviour
     public float height = 64;
     public float heightUVScale = 4;
     public int chunkSize = 16;
+    [Range(0.0f, 1.0f)]
+    public float heightColorNoiseFactor = 0;
+    public float heightColorNoiseScale = 5f;
+    public int heightColorNoiseOffset = 0;
+    public int heightColorNoiseOctaves = 2;
+    public float heightColorNoiseLacunarity = 2f;
+    public float heightColorNoisePersistence = 0.3f;
 
     public bool generateColliders = true;
 
@@ -30,6 +37,9 @@ public class VoxelTerrain : MonoBehaviour
         public void GenerateCollider()
         {
             var go = new GameObject(mesh.name);
+            // We do not want to save the collider with the scene
+            go.hideFlags = HideFlags.DontSave;
+
             collider = go.AddComponent<MeshCollider>();
             collider.sharedMesh = mesh;
         }
@@ -40,6 +50,12 @@ public class VoxelTerrain : MonoBehaviour
     public void GenerateTerrain()
     {
         ClearChunks();
+
+        // Clear any remaining child objects
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            Object.DestroyImmediate(transform.GetChild(i).gameObject);
+        }
 
         int chunksX = Mathf.CeilToInt(size.x / chunkSize);
         int chunksY = Mathf.CeilToInt(size.y / chunkSize);
@@ -52,7 +68,7 @@ public class VoxelTerrain : MonoBehaviour
             for (var cx = 0; cx < chunksX; cx++)
             {
                 var chunk = GenerateChunk(cx, cy, chunksScale);
-                chunk.matrix = Matrix4x4.TRS(transform.TransformPoint(pos), transform.rotation, transform.lossyScale);
+                chunk.matrix = Matrix4x4.TRS(pos, Quaternion.identity, Vector3.one);
                 chunks.Add(chunk);
 
                 if (generateColliders)
@@ -160,11 +176,16 @@ public class VoxelTerrain : MonoBehaviour
         var uv_BottomLeft = Vector2.zero;
         var uv_TopRight = Vector2.one;
 
-        float heightBase = 0f;
-        float heightX = 0f;
-        float heightZ = 0f;
-        float maxHeight = 0f;
-        float minHeight = 0f;
+        var heightBase = 0f;
+        var heightX = 0f;
+        var heightZ = 0f;
+        var maxHeight = 0f;
+        var minHeight = 0f;
+
+        var noiseUV = Vector2.zero;
+        var uvOffset = 0f;
+        var maxNoiseValue = 0f;
+        var noiseOctaveIntensity = 1f;
 
         var heights = heightMap.GetPixels(pixelOffsetX, pixelOffsetY, blockWidth, blockHeight, 0);
         var pixelIndex = startY * blockWidth + startX;
@@ -173,6 +194,26 @@ public class VoxelTerrain : MonoBehaviour
         {
             for (var x = startX; x < blockWidth; x++)
             {
+                noiseUV.x = cx + x - startX;
+                noiseUV.y = cy + z - startY;
+                noiseUV *= heightColorNoiseScale;
+                uvOffset = 0;
+
+                maxNoiseValue = 0f;
+                noiseOctaveIntensity = 1f;
+                for (int i=0; i<heightColorNoiseOctaves; i++)
+                {
+                    uvOffset += (Mathf.PerlinNoise(noiseUV.x, noiseUV.y)*2-1) * noiseOctaveIntensity;
+                    noiseUV *= heightColorNoiseLacunarity;
+                    maxNoiseValue += noiseOctaveIntensity;
+                    noiseOctaveIntensity *= heightColorNoisePersistence;
+                }
+                uvOffset /= maxNoiseValue;
+
+                uvOffset = uvOffset * heightColorNoiseFactor * heightColorNoiseOffset;
+                uvOffset = Mathf.Round(uvOffset);
+                uvOffset *= du;
+
                 // top face
                 heightBase = heights[pixelIndex].r;
                 position.y = heightBase * scale.y;
@@ -181,6 +222,9 @@ public class VoxelTerrain : MonoBehaviour
                 uv_TopRight.x = uv_BottomLeft.x + du;
                 uv_BottomLeft.y = 1.0f - dv;
                 uv_TopRight.y = 1.0f;
+
+                uv_BottomLeft.x += uvOffset;
+                uv_TopRight.x += uvOffset;
 
                 AddQuad(position, dx, dz, Vector3.up, uv_BottomLeft, uv_TopRight);
 
@@ -200,6 +244,9 @@ public class VoxelTerrain : MonoBehaviour
                         uv_TopRight.x = uv_BottomLeft.x + du;
                         uv_TopRight.y = 1.0f - dv;
                         uv_BottomLeft.y = uv_TopRight.y - (maxHeight - minHeight)*heightUVScale;
+
+                        uv_BottomLeft.x += uvOffset;
+                        uv_TopRight.x += uvOffset;
 
                         AddQuad(position, dz, dh, Vector3.left, uv_BottomLeft, uv_TopRight, heightX < heightBase);
                     }
@@ -221,6 +268,9 @@ public class VoxelTerrain : MonoBehaviour
                         uv_TopRight.x = uv_BottomLeft.x + du;
                         uv_TopRight.y = 1.0f - dv;
                         uv_BottomLeft.y = uv_TopRight.y - (maxHeight - minHeight) * heightUVScale;
+
+                        uv_BottomLeft.x += uvOffset;
+                        uv_TopRight.x += uvOffset;
 
                         AddQuad(position, dx, dh, Vector3.back, uv_BottomLeft, uv_TopRight, heightZ > heightBase);
                     }
@@ -256,6 +306,8 @@ public class VoxelTerrain : MonoBehaviour
         {
             Object.DestroyImmediate(chunk.mesh);
             Object.DestroyImmediate(chunk.material);
+            if (chunk.collider != null)
+                Object.DestroyImmediate (chunk.collider.gameObject);
         }
         chunks.Clear();
     }
@@ -270,7 +322,7 @@ public class VoxelTerrain : MonoBehaviour
         renderParams.receiveShadows = true;
         foreach (var chunk in chunks)
         {
-            Graphics.RenderMesh( renderParams, chunk.mesh, 0, chunk.matrix);
+            Graphics.RenderMesh( renderParams, chunk.mesh, 0, transform.localToWorldMatrix * chunk.matrix);
         }
     }
 
@@ -288,7 +340,7 @@ public class VoxelTerrain : MonoBehaviour
         foreach (var chunk in chunks)
         {
             Gizmos.color = Color.HSVToRGB(Random.value, 1, 1);
-            Gizmos.matrix = chunk.matrix;
+            Gizmos.matrix = transform.localToWorldMatrix * chunk.matrix;
             //Gizmos.DrawWireCube(chunksScale * 0.5f, chunksScale);
             //Gizmos.DrawWireCube( chunk.mesh.bounds.center , chunk.mesh.bounds.size);
             Gizmos.DrawWireMesh(chunk.mesh);

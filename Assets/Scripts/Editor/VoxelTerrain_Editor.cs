@@ -10,7 +10,7 @@ public class VoxelTerrain_Editor : Editor
     {
         base.OnInspectorGUI();
 
-        if (GUILayout.Button("Regenrate"))
+        if (GUILayout.Button("Regenerate"))
         {
             var voxelTerrain = (VoxelTerrain)target;
             voxelTerrain.GenerateTerrain();
