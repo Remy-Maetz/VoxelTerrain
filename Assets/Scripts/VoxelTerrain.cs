@@ -15,20 +15,29 @@ public class VoxelTerrain : MonoBehaviour
     public float heightUVScale = 4;
     public int chunkSize = 16;
 
-    public bool drawGizmos = true;
+    public bool generateColliders = true;
 
-    public bool regenerate = false;
+    public bool drawGizmos = true;
 
     struct Chunk
     {
         public Mesh mesh;
         public Matrix4x4 matrix;
         public Material material;
+
+        public MeshCollider collider;
+
+        public void GenerateCollider()
+        {
+            var go = new GameObject(mesh.name);
+            collider = go.AddComponent<MeshCollider>();
+            collider.sharedMesh = mesh;
+        }
     }
 
     private List<Chunk> chunks = new List<Chunk>();
 
-    void GenerateTerrain()
+    public void GenerateTerrain()
     {
         ClearChunks();
 
@@ -45,6 +54,16 @@ public class VoxelTerrain : MonoBehaviour
                 var chunk = GenerateChunk(cx, cy, chunksScale);
                 chunk.matrix = Matrix4x4.TRS(transform.TransformPoint(pos), transform.rotation, transform.lossyScale);
                 chunks.Add(chunk);
+
+                if (generateColliders)
+                {
+                    chunk.GenerateCollider();
+                    chunk.collider.transform.parent = transform;
+                    chunk.collider.transform.localPosition = pos;
+                    chunk.collider.transform.localRotation = Quaternion.identity;
+                    chunk.collider.transform.localScale = Vector3.one;
+                }
+
                 pos.x += chunksScale.x;
             }
             pos.x = -size.x * 0.5f;
@@ -224,6 +243,7 @@ public class VoxelTerrain : MonoBehaviour
         mesh.uv = uvs.ToArray();
         mesh.triangles = triangles.ToArray();
         mesh.RecalculateBounds();
+        mesh.name = $"Terrain_{cx}_{cy}";
 
         chunk.mesh = mesh;
 
@@ -257,14 +277,6 @@ public class VoxelTerrain : MonoBehaviour
     private void Update()
     {
         RenderTerrain();
-    }
-
-    private void OnValidate()
-    {
-        if (regenerate)
-            regenerate = false;
-
-        GenerateTerrain();
     }
 
     private void OnDrawGizmosSelected()
