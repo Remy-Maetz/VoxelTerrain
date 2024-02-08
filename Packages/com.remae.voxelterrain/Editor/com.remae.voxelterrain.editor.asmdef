@@ -1,0 +1,16 @@
+{
+    "name": "com.remae.voxelterrain.editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:292996614bd1bc243a5b62dee801c868"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

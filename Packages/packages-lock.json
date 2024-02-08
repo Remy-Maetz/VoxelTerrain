@@ -18,6 +18,12 @@
       "dependencies": {},
       "url": "https://package.openupm.com"
     },
+    "com.remae.voxelterrain": {
+      "version": "file:com.remae.voxelterrain",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.unity.burst": {
       "version": "1.8.10",
       "depth": 1,
