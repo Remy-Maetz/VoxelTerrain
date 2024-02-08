@@ -96,6 +96,53 @@ public class VoxelTerrain : MonoBehaviour
         var triangles = new List<int>();
         var vertexIndex = 0;
 
+        var pixelOffsetX = cx * chunkSize;
+        var pixelOffsetY = cy * chunkSize;
+        var blockWidth = chunkSize;
+        var blockHeight = chunkSize;
+        var startX = 0;
+        var startY = 0;
+        if (doXFace)
+        {
+            pixelOffsetX--;
+            blockWidth++;
+            startX++;
+        }
+        if (doZFace)
+        {
+            pixelOffsetY--;
+            blockHeight++;
+            startY++;
+        }
+        blockWidth = Mathf.Min(blockWidth, heightMap.width - pixelOffsetX);
+        blockHeight = Mathf.Min(blockHeight, heightMap.height - pixelOffsetY);
+
+        var deltaX = chunkSize / scale.x;
+        var deltaZ = chunkSize / scale.z;
+
+        var dx = new Vector3(deltaX, 0, 0);
+        var dz = new Vector3(0, 0, deltaZ);
+        var dh = Vector3.zero;
+        var du = 1.0f / colorMap.width;
+        var dv = 1.0f / colorMap.height;
+
+        var position = Vector3.zero;
+        var uv_BottomLeft = Vector2.zero;
+        var uv_TopRight = Vector2.one;
+
+        var heightBase = 0f;
+        var heightX = 0f;
+        var heightZ = 0f;
+        float heightDiff, heightMin, heightMax;
+
+        var noiseUV = Vector2.zero;
+        var uvOffset = 0f;
+        var maxNoiseValue = 0f;
+        var noiseOctaveIntensity = 1f;
+
+        var heights = heightMap.GetPixels(pixelOffsetX, pixelOffsetY, blockWidth, blockHeight, 0);
+        var pixelIndex = startY * blockWidth + startX;
+
         void AddQuad( Vector3 origin, Vector3 right, Vector3 up, Vector3 normal, Vector2 uv_BottomLeft, Vector2 uv_TopRight, bool flip = false )
         {
             vertices.Add(origin);
@@ -135,53 +182,56 @@ public class VoxelTerrain : MonoBehaviour
             vertexIndex += 4;
         }
 
-        var pixelOffsetX = cx * chunkSize;
-        var pixelOffsetY = cy * chunkSize;
-        var blockWidth = chunkSize;
-        var blockHeight = chunkSize;
-        var startX = 0;
-        var startY = 0;
-        if (doXFace)
+        void AddTopFace( float height )
         {
-            pixelOffsetX --;
-            blockWidth++;
-            startX++;
+            position.y = heightBase * scale.y;
+
+            uv_BottomLeft.x = Mathf.Floor(heightBase * colorMap.width) * du;
+            uv_TopRight.x = uv_BottomLeft.x + du;
+            uv_BottomLeft.y = 1.0f - dv;
+            uv_TopRight.y = 1.0f;
+
+            uv_BottomLeft.x += uvOffset;
+            uv_TopRight.x += uvOffset;
+
+            AddQuad(position, dx, dz, Vector3.up, uv_BottomLeft, uv_TopRight);
         }
-        if (doZFace)
+
+        void AddSideFace( Vector3 right, float heightA, float heightB, bool flip )
         {
-            pixelOffsetY--;
-            blockHeight++;
-            startY++;
+            heightDiff = heightB - heightA;
+
+            // Don't do the face if the height difference is "about" null
+            if (Mathf.Abs(heightDiff) <= Mathf.Epsilon)
+                return;
+
+            if (heightDiff > 0)
+            {
+                heightMax = heightB;
+                heightMin = heightA;
+            }
+            else
+            {
+                heightMax = heightA;
+                heightMin = heightB;
+                heightDiff = -heightDiff;
+                flip = !flip;
+            }
+
+            position.y = heightMin * scale.y;
+            dh.y = heightDiff * scale.y;
+
+            uv_BottomLeft.x = Mathf.Floor(heightMax * colorMap.width) * du;
+            uv_TopRight.x = uv_BottomLeft.x + du;
+            uv_TopRight.y = 1.0f - dv;
+            uv_BottomLeft.y = uv_TopRight.y - heightDiff * heightUVScale;
+
+            uv_BottomLeft.x += uvOffset;
+            uv_TopRight.x += uvOffset;
+
+
+            AddQuad(position, right, dh, Vector3.Cross(right, dh).normalized, uv_BottomLeft, uv_TopRight, flip);
         }
-        blockWidth = Mathf.Min(blockWidth, heightMap.width - pixelOffsetX);
-        blockHeight = Mathf.Min(blockHeight, heightMap.height - pixelOffsetY);
-
-        var deltaX = chunkSize / scale.x;
-        var deltaZ = chunkSize / scale.z;
-
-        var dx = new Vector3( deltaX, 0, 0);
-        var dz = new Vector3( 0, 0, deltaZ);
-        var dh = Vector3.zero;
-        var du = 1.0f / colorMap.width;
-        var dv = 1.0f / colorMap.height;
-
-        var position = Vector3.zero;
-        var uv_BottomLeft = Vector2.zero;
-        var uv_TopRight = Vector2.one;
-
-        var heightBase = 0f;
-        var heightX = 0f;
-        var heightZ = 0f;
-        var maxHeight = 0f;
-        var minHeight = 0f;
-
-        var noiseUV = Vector2.zero;
-        var uvOffset = 0f;
-        var maxNoiseValue = 0f;
-        var noiseOctaveIntensity = 1f;
-
-        var heights = heightMap.GetPixels(pixelOffsetX, pixelOffsetY, blockWidth, blockHeight, 0);
-        var pixelIndex = startY * blockWidth + startX;
 
         for (var z = startY; z < blockHeight; z++)
         {
@@ -209,64 +259,18 @@ public class VoxelTerrain : MonoBehaviour
 
                 // top face
                 heightBase = heights[pixelIndex].r;
-                position.y = heightBase * scale.y;
-
-                uv_BottomLeft.x = Mathf.Floor(heightBase * colorMap.width)*du;
-                uv_TopRight.x = uv_BottomLeft.x + du;
-                uv_BottomLeft.y = 1.0f - dv;
-                uv_TopRight.y = 1.0f;
-
-                uv_BottomLeft.x += uvOffset;
-                uv_TopRight.x += uvOffset;
-
-                AddQuad(position, dx, dz, Vector3.up, uv_BottomLeft, uv_TopRight);
+                AddTopFace(heightBase);
 
                 // -x vertical face
                 if (x > 0 || doXFace)
                 {
-                    heightX = heights[pixelIndex - 1].r;
-                    if (Mathf.Abs(heightBase - heightX) > Mathf.Epsilon)
-                    {
-                        maxHeight = Mathf.Max(heightX, heightBase);
-                        minHeight = Mathf.Min(heightX, heightBase);
-
-                        position.y = minHeight * scale.y;
-                        dh.y = (maxHeight - minHeight) * scale.y;
-
-                        uv_BottomLeft.x = Mathf.Floor(maxHeight * colorMap.width) * du;
-                        uv_TopRight.x = uv_BottomLeft.x + du;
-                        uv_TopRight.y = 1.0f - dv;
-                        uv_BottomLeft.y = uv_TopRight.y - (maxHeight - minHeight)*heightUVScale;
-
-                        uv_BottomLeft.x += uvOffset;
-                        uv_TopRight.x += uvOffset;
-
-                        AddQuad(position, dz, dh, Vector3.left, uv_BottomLeft, uv_TopRight, heightX < heightBase);
-                    }
+                    AddSideFace(dz, heightBase, heights[pixelIndex - 1].r, false);
                 }
 
                 // -z vertical face
                 if (z > 0 || doZFace)
                 {
-                    heightZ = heights[pixelIndex - blockWidth].r;
-                    if (Mathf.Abs(heightBase - heightZ) > Mathf.Epsilon)
-                    {
-                        maxHeight = Mathf.Max(heightZ, heightBase);
-                        minHeight = Mathf.Min(heightZ, heightBase);
-
-                        position.y = minHeight * scale.y;
-                        dh.y = (maxHeight - minHeight) * scale.y;
-
-                        uv_BottomLeft.x = Mathf.Floor(maxHeight * colorMap.width) * du;
-                        uv_TopRight.x = uv_BottomLeft.x + du;
-                        uv_TopRight.y = 1.0f - dv;
-                        uv_BottomLeft.y = uv_TopRight.y - (maxHeight - minHeight) * heightUVScale;
-
-                        uv_BottomLeft.x += uvOffset;
-                        uv_TopRight.x += uvOffset;
-
-                        AddQuad(position, dx, dh, Vector3.back, uv_BottomLeft, uv_TopRight, heightZ > heightBase);
-                    }
+                    AddSideFace(dx, heightBase, heights[pixelIndex - blockWidth].r, true);
                 }
 
                 pixelIndex++;
