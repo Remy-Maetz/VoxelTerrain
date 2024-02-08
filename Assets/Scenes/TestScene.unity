@@ -173,15 +173,16 @@ MonoBehaviour:
   size: {x: 256, y: 256}
   height: 32
   heightUVScale: 1
-  chunkSize: 16
-  heightColorNoiseFactor: 1
+  chunkSize: 64
+  heightColorNoiseFactor: 0.89
   heightColorNoiseScale: 0.1
   heightColorNoiseOffset: 5
   heightColorNoiseOctaves: 5
   heightColorNoiseLacunarity: 1.5
   heightColorNoisePersistence: 0.3
+  uvMode: 1
   generateColliders: 1
-  drawGizmos: 0
+  gizmoMode: 0
 --- !u!1 &930068311
 GameObject:
   m_ObjectHideFlags: 0

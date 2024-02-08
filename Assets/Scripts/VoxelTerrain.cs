@@ -22,6 +22,14 @@ public class VoxelTerrain : MonoBehaviour
     public float heightColorNoiseLacunarity = 2f;
     public float heightColorNoisePersistence = 0.3f;
 
+    public enum UVMode
+    {
+        None,
+        OnePixelTop,
+        PixelCenter
+    };
+    public UVMode uvMode = UVMode.OnePixelTop;
+
     public bool generateColliders = true;
 
     struct Chunk
@@ -136,12 +144,14 @@ public class VoxelTerrain : MonoBehaviour
         float heightDiff, heightMin, heightMax;
 
         var noiseUV = Vector2.zero;
-        var uvOffset = 0f;
+        var uvOffset = Vector2.zero;
         var maxNoiseValue = 0f;
         var noiseOctaveIntensity = 1f;
 
         var heights = heightMap.GetPixels(pixelOffsetX, pixelOffsetY, blockWidth, blockHeight, 0);
         var pixelIndex = startY * blockWidth + startX;
+
+        int x, z;
 
         void AddQuad( Vector3 origin, Vector3 right, Vector3 up, Vector3 normal, Vector2 uv_BottomLeft, Vector2 uv_TopRight, bool flip = false )
         {
@@ -155,10 +165,10 @@ public class VoxelTerrain : MonoBehaviour
             normals.Add(normal);
             normals.Add(normal);
 
-            uvs.Add(uv_BottomLeft);
-            uvs.Add(new Vector2(uv_TopRight.x, uv_BottomLeft.y));
-            uvs.Add(uv_TopRight);
-            uvs.Add(new Vector2(uv_BottomLeft.x, uv_TopRight.y));
+            uvs.Add(uv_BottomLeft + uvOffset);
+            uvs.Add(new Vector2(uv_TopRight.x, uv_BottomLeft.y) + uvOffset);
+            uvs.Add(uv_TopRight + uvOffset);
+            uvs.Add(new Vector2(uv_BottomLeft.x, uv_TopRight.y) + uvOffset);
 
             if (flip)
             {
@@ -182,17 +192,32 @@ public class VoxelTerrain : MonoBehaviour
             vertexIndex += 4;
         }
 
+        void ZeroUV() { uv_BottomLeft = uv_TopRight = Vector2.zero; }
+        void PixelCenterUV()
+        {
+            uv_BottomLeft.x = uv_TopRight.x = (cx * chunkSize + x + 0.5f) * 1.0f / heightMap.width;
+            uv_BottomLeft.y = uv_TopRight.y = (cy * chunkSize + z + 0.5f) * 1.0f / heightMap.height;
+        }
+
         void AddTopFace( float height )
         {
             position.y = heightBase * scale.y;
 
-            uv_BottomLeft.x = Mathf.Floor(heightBase * colorMap.width) * du;
-            uv_TopRight.x = uv_BottomLeft.x + du;
-            uv_BottomLeft.y = 1.0f - dv;
-            uv_TopRight.y = 1.0f;
-
-            uv_BottomLeft.x += uvOffset;
-            uv_TopRight.x += uvOffset;
+            switch (uvMode)
+            {
+                case UVMode.OnePixelTop:
+                    uv_BottomLeft.x = Mathf.Floor(heightBase * colorMap.width) * du;
+                    uv_TopRight.x = uv_BottomLeft.x + du;
+                    uv_BottomLeft.y = 1.0f - dv;
+                    uv_TopRight.y = 1.0f;
+                    break;
+                case UVMode.PixelCenter:
+                    PixelCenterUV();
+                    break;
+                default:
+                    ZeroUV();
+                    break;
+            }
 
             AddQuad(position, dx, dz, Vector3.up, uv_BottomLeft, uv_TopRight);
         }
@@ -221,41 +246,49 @@ public class VoxelTerrain : MonoBehaviour
             position.y = heightMin * scale.y;
             dh.y = heightDiff * scale.y;
 
-            uv_BottomLeft.x = Mathf.Floor(heightMax * colorMap.width) * du;
-            uv_TopRight.x = uv_BottomLeft.x + du;
-            uv_TopRight.y = 1.0f - dv;
-            uv_BottomLeft.y = uv_TopRight.y - heightDiff * heightUVScale;
-
-            uv_BottomLeft.x += uvOffset;
-            uv_TopRight.x += uvOffset;
+            switch (uvMode)
+            {
+                case UVMode.OnePixelTop:
+                    uv_BottomLeft.x = Mathf.Floor(heightMax * colorMap.width) * du;
+                    uv_TopRight.x = uv_BottomLeft.x + du;
+                    uv_TopRight.y = 1.0f - dv;
+                    uv_BottomLeft.y = uv_TopRight.y - heightDiff * heightUVScale;
+                    break;
+                case UVMode.PixelCenter:
+                    PixelCenterUV();
+                    break;
+                default:
+                    ZeroUV();
+                    break;
+            }
 
 
             AddQuad(position, right, dh, Vector3.Cross(right, dh).normalized, uv_BottomLeft, uv_TopRight, flip);
         }
 
-        for (var z = startY; z < blockHeight; z++)
+        for (z = startY; z < blockHeight; z++)
         {
-            for (var x = startX; x < blockWidth; x++)
+            for (x = startX; x < blockWidth; x++)
             {
-                noiseUV.x = cx + x - startX;
-                noiseUV.y = cy + z - startY;
+                noiseUV.x = cx * chunkSize + x;
+                noiseUV.y = cy * chunkSize + z;
                 noiseUV *= heightColorNoiseScale;
-                uvOffset = 0;
+                uvOffset.x = 0;
 
                 maxNoiseValue = 0f;
                 noiseOctaveIntensity = 1f;
                 for (int i=0; i<heightColorNoiseOctaves; i++)
                 {
-                    uvOffset += (Mathf.PerlinNoise(noiseUV.x, noiseUV.y)*2-1) * noiseOctaveIntensity;
+                    uvOffset.x += (Mathf.PerlinNoise(noiseUV.x, noiseUV.y)*2-1) * noiseOctaveIntensity;
                     noiseUV *= heightColorNoiseLacunarity;
                     maxNoiseValue += noiseOctaveIntensity;
                     noiseOctaveIntensity *= heightColorNoisePersistence;
                 }
-                uvOffset /= maxNoiseValue;
+                uvOffset.x /= maxNoiseValue;
 
-                uvOffset = uvOffset * heightColorNoiseFactor * heightColorNoiseOffset;
-                uvOffset = Mathf.Round(uvOffset);
-                uvOffset *= du;
+                uvOffset.x = uvOffset.x * heightColorNoiseFactor * heightColorNoiseOffset;
+                uvOffset.x = Mathf.Round(uvOffset.x);
+                uvOffset.x *= du;
 
                 // top face
                 heightBase = heights[pixelIndex].r;
