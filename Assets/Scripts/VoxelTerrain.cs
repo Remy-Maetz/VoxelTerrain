@@ -24,8 +24,6 @@ public class VoxelTerrain : MonoBehaviour
 
     public bool generateColliders = true;
 
-    public bool drawGizmos = true;
-
     struct Chunk
     {
         public Mesh mesh;
@@ -51,16 +49,10 @@ public class VoxelTerrain : MonoBehaviour
     {
         ClearChunks();
 
-        // Clear any remaining child objects
-        for (int i = transform.childCount - 1; i >= 0; i--)
-        {
-            Object.DestroyImmediate(transform.GetChild(i).gameObject);
-        }
-
         int chunksX = Mathf.CeilToInt(size.x / chunkSize);
         int chunksY = Mathf.CeilToInt(size.y / chunkSize);
 
-        var chunksScale = new Vector3( size.x / chunkSize, height , size.y / chunkSize );
+        var chunksScale = new Vector3(chunkSize * size.x / heightMap.width, height , chunkSize * size.y / heightMap.height);
         var pos = new Vector3(-size.x * 0.5f, -height * 0.5f, -size.y * 0.5f);
 
         for (var cy = 0; cy < chunksY; cy++)
@@ -97,6 +89,7 @@ public class VoxelTerrain : MonoBehaviour
         chunk.material = Instantiate( referenceMaterial );
 
         var mesh = new Mesh();
+        mesh.hideFlags = HideFlags.DontSave;
         var vertices = new List<Vector3>();
         var normals = new List<Vector3>();
         var uvs = new List<Vector2>();
@@ -310,6 +303,12 @@ public class VoxelTerrain : MonoBehaviour
                 Object.DestroyImmediate (chunk.collider.gameObject);
         }
         chunks.Clear();
+
+        // Clear any remaining child objects
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            Object.DestroyImmediate(transform.GetChild(i).gameObject);
+        }
     }
 
     void RenderTerrain()
@@ -331,9 +330,31 @@ public class VoxelTerrain : MonoBehaviour
         RenderTerrain();
     }
 
+    private void Start()
+    {
+        GenerateTerrain();
+    }
+
+    //This will recreate the terrain on domain reload
+    private void OnEnable()
+    {
+        if (chunks.Count == 0)
+            GenerateTerrain();
+    }
+
+    [System.Flags]
+    public enum GizmosModes
+    {
+        None = 0,
+        Bound = 1,
+        Mesh = 2
+    };
+    [HideInInspector]
+    public GizmosModes gizmoMode = GizmosModes.None;
+
     private void OnDrawGizmosSelected()
     {
-        if (!drawGizmos) return;
+        if (gizmoMode == GizmosModes.None) return;
 
         var chunksScale = new Vector3(size.x / chunkSize, height, size.y / chunkSize);
         Random.InitState( 42 );
@@ -341,9 +362,9 @@ public class VoxelTerrain : MonoBehaviour
         {
             Gizmos.color = Color.HSVToRGB(Random.value, 1, 1);
             Gizmos.matrix = transform.localToWorldMatrix * chunk.matrix;
-            //Gizmos.DrawWireCube(chunksScale * 0.5f, chunksScale);
-            //Gizmos.DrawWireCube( chunk.mesh.bounds.center , chunk.mesh.bounds.size);
-            Gizmos.DrawWireMesh(chunk.mesh);
+
+            if (gizmoMode.HasFlag(GizmosModes.Bound)) Gizmos.DrawWireCube( chunk.mesh.bounds.center , chunk.mesh.bounds.size);
+            if (gizmoMode.HasFlag(GizmosModes.Mesh)) Gizmos.DrawWireMesh(chunk.mesh);
         }
     }
 }
