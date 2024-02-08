@@ -139,8 +139,6 @@ public class VoxelTerrain : MonoBehaviour
         var uv_TopRight = Vector2.one;
 
         var heightBase = 0f;
-        var heightX = 0f;
-        var heightZ = 0f;
         float heightDiff, heightMin, heightMax;
 
         var noiseUV = Vector2.zero;
@@ -152,6 +150,8 @@ public class VoxelTerrain : MonoBehaviour
         var pixelIndex = startY * blockWidth + startX;
 
         int x, z;
+
+        var bounds = new Bounds();
 
         void AddQuad( Vector3 origin, Vector3 right, Vector3 up, Vector3 normal, Vector2 uv_BottomLeft, Vector2 uv_TopRight, bool flip = false )
         {
@@ -188,6 +188,11 @@ public class VoxelTerrain : MonoBehaviour
                 triangles.Add(vertexIndex);
                 triangles.Add(vertexIndex + 3);
             }
+
+            bounds.Encapsulate(vertices[vertexIndex]);
+            bounds.Encapsulate(vertices[vertexIndex+1]);
+            bounds.Encapsulate(vertices[vertexIndex+2]);
+            bounds.Encapsulate(vertices[vertexIndex+3]);
 
             vertexIndex += 4;
         }
@@ -322,7 +327,7 @@ public class VoxelTerrain : MonoBehaviour
         mesh.normals = normals.ToArray();
         mesh.uv = uvs.ToArray();
         mesh.triangles = triangles.ToArray();
-        mesh.RecalculateBounds();
+        mesh.bounds = bounds;
         mesh.name = $"Terrain_{cx}_{cy}";
 
         chunk.mesh = mesh;
