@@ -25,9 +25,20 @@ public class VoxelTerrain_Editor : Editor
         EditorGUILayout.PropertyField(serializedObject.FindProperty("gizmoMode"));
         serializedObject.ApplyModifiedProperties();
 
-        if (GUILayout.Button("Regenerate"))
+        if (voxelTerrain.heightMap == null || voxelTerrain.colorMap == null )
         {
-            voxelTerrain.GenerateTerrain();
+            EditorGUILayout.HelpBox("Missing Height Map or Color Map for terrain generation.", MessageType.Warning);
+        }
+        else if (!voxelTerrain.heightMap.isReadable)
+        {
+            EditorGUILayout.HelpBox("Height Map must be Readable (check import settings).", MessageType.Warning);
+        }
+        else
+        {
+            if (GUILayout.Button("Regenerate"))
+            {
+                voxelTerrain.GenerateTerrain();
+            }
         }
     }
 }

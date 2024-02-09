@@ -55,6 +55,12 @@ public class VoxelTerrain : MonoBehaviour
 
     public void GenerateTerrain()
     {
+        if (heightMap == null || colorMap == null)
+        {
+            Debug.LogWarning("No maps provided for terrain generation.");
+            return;
+        }
+
         ClearChunks();
 
         float chunksXf = heightMap.width * 1.0f / chunkSize;
