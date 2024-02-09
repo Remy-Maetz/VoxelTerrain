@@ -57,17 +57,20 @@ public class VoxelTerrain : MonoBehaviour
     {
         ClearChunks();
 
-        int chunksX = Mathf.CeilToInt(size.x / chunkSize);
-        int chunksY = Mathf.CeilToInt(size.y / chunkSize);
+        float chunksXf = heightMap.width * 1.0f / chunkSize;
+        float chunksYf = heightMap.height * 1.0f / chunkSize;
 
-        var chunksScale = new Vector3(chunkSize * size.x / heightMap.width, height , chunkSize * size.y / heightMap.height);
+        int chunksX = Mathf.CeilToInt(chunksXf);
+        int chunksY = Mathf.CeilToInt(chunksYf);
+
+        var chunksSize = new Vector3( size.x / chunksXf, height , size.y / chunksYf);
         var pos = new Vector3(-size.x * 0.5f, -height * 0.5f, -size.y * 0.5f);
 
         for (var cy = 0; cy < chunksY; cy++)
         {
             for (var cx = 0; cx < chunksX; cx++)
             {
-                var chunk = GenerateChunk(cx, cy, chunksScale);
+                var chunk = GenerateChunk(cx, cy, chunksSize);
                 chunk.matrix = Matrix4x4.TRS(pos, Quaternion.identity, Vector3.one);
                 chunks.Add(chunk);
 
@@ -80,14 +83,14 @@ public class VoxelTerrain : MonoBehaviour
                     chunk.collider.transform.localScale = Vector3.one;
                 }
 
-                pos.x += chunksScale.x;
+                pos.x += chunksSize.x;
             }
             pos.x = -size.x * 0.5f;
-            pos.z += chunksScale.z;
+            pos.z += chunksSize.z;
         }
     }
 
-    Chunk GenerateChunk( int cx, int cy, Vector3 scale )
+    Chunk GenerateChunk( int cx, int cy, Vector3 size )
     {
         Chunk chunk = new Chunk();
 
@@ -125,8 +128,8 @@ public class VoxelTerrain : MonoBehaviour
         blockWidth = Mathf.Min(blockWidth, heightMap.width - pixelOffsetX);
         blockHeight = Mathf.Min(blockHeight, heightMap.height - pixelOffsetY);
 
-        var deltaX = chunkSize / scale.x;
-        var deltaZ = chunkSize / scale.z;
+        var deltaX = size.x / chunkSize;
+        var deltaZ = size.z / chunkSize;
 
         var dx = new Vector3(deltaX, 0, 0);
         var dz = new Vector3(0, 0, deltaZ);
@@ -206,7 +209,7 @@ public class VoxelTerrain : MonoBehaviour
 
         void AddTopFace( float height )
         {
-            position.y = heightBase * scale.y;
+            position.y = heightBase * size.y;
 
             switch (uvMode)
             {
@@ -248,8 +251,8 @@ public class VoxelTerrain : MonoBehaviour
                 flip = !flip;
             }
 
-            position.y = heightMin * scale.y;
-            dh.y = heightDiff * scale.y;
+            position.y = heightMin * size.y;
+            dh.y = heightDiff * size.y;
 
             switch (uvMode)
             {
