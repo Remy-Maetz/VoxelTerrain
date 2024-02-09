@@ -1,8 +1,8 @@
 {
   "name": "com.remae.voxelterrain",
   "displayName": "Voxel Terrain",
-  "version": "0.0.1",
-  "unity": "2022.3",
+  "version": "0.0.2",
+  "unity": "2021.3",
   "description": "Voxel like terrain rendering & collision from heightmap",
   "keywords": [
     "terrain",
@@ -16,7 +16,7 @@
   "dependencies": {
   },
   "hideInEditor": false,
-  "unityRelease": "0f1",
+  "unityRelease": "10f1",
   "samples": [
     {
     }
